@@ -2,4 +2,4 @@
 .vscode
 
 data.json
-chromedriver-win64
+chromedriver.exe

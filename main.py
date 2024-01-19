@@ -1,4 +1,12 @@
 import socket
+import os
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+import time
+import json
+
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 
 def get_local_ip():
@@ -21,64 +29,52 @@ def get_local_ip():
         s.close()
 
 
-# Get and print the local IP address
-local_ip = get_local_ip()
-
-if local_ip:
-    print(f"Local IP Address: {local_ip}")
-else:
-    print("Failed to retrieve local IP address.")
-
-
-from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
-import time
-
-
-def configure_port_forwarding(
-    router_ip, username, password, internal_ip, internal_port, external_port
-):
-    # Set up the Selenium WebDriver (make sure to replace the path with the path to your webdriver executable)
-    driver = webdriver.Chrome(executable_path="/path/to/chromedriver")
+def configure_port_forwarding(data, local_ip):
+    # Set up the Selenium WebDriver
+    driver = webdriver.Chrome(service=Service(f"{os.getcwd()}/chromedriver.exe"))
 
     try:
-        # Open the router's web interface
-        driver.get(f"http://{router_ip}")
+        # Open the router's web interface on the virtual server page
+        driver.get(
+            f"http://{data['username']}:{data['password']}@{data['router_ip']}/scvrtsrv.cmd?action=view"
+        )
 
-        # Find and fill in the username and password fields
-        driver.find_element_by_name("username").send_keys(username)
-        driver.find_element_by_name("password").send_keys(password)
+        # Wait for the page to load
+        time.sleep(3)
 
-        # Submit the login form
-        driver.find_element_by_id("loginBtn").click()
+        # Get the checkbox to remove the previous port forward (there will always be one)
+        checkbox = driver.find_element(By.NAME, "rml")
 
-        # Wait for the page to load (you may need to adjust the sleep duration)
-        time.sleep(2)
+        current_forwarded_ip = checkbox.get_attribute("value").split("|")[0]
 
-        # Navigate to the port forwarding section (replace with the actual link or button ID)
-        driver.get("http://{router_ip}/port_forwarding")
+        if current_forwarded_ip == local_ip:
+            print("Server already forwarded")
+            driver.quit()
+            return
 
-        # Fill in the port forwarding details
-        driver.find_element_by_name("internal_ip").send_keys(internal_ip)
-        driver.find_element_by_name("internal_port").send_keys(internal_port)
-        driver.find_element_by_name("external_port").send_keys(external_port)
+        print("Server not forwarded, press enter to proceed with forwarding")
+        input()
 
-        # Submit the port forwarding form (replace with the actual button or form submission method)
-        driver.find_element_by_id("submitBtn").click()
+        checkbox.click()
+        time.sleep(10)
 
     finally:
         # Close the browser window
         driver.quit()
 
 
-# Replace the placeholders with your router's information
-router_ip = "your_router_ip"
-username = "your_router_username"
-password = "your_router_password"
-internal_ip = "internal_device_ip"
-internal_port = "internal_device_port"
-external_port = "external_port"
+if __name__ == "__main__":
+    # load the data
+    with open(f"{os.getcwd()}/data.json", "r") as f:
+        data = json.load(f)
 
-configure_port_forwarding(
-    router_ip, username, password, internal_ip, internal_port, external_port
-)
+    # Get and print the local IP address
+    local_ip = get_local_ip()
+
+    if local_ip:
+        print(f"Local IP Address: {local_ip}")
+    else:
+        print("Failed to retrieve local IP address.")
+        quit()
+
+    configure_port_forwarding(data, local_ip)
